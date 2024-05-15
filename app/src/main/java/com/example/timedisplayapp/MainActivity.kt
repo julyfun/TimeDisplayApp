@@ -1,11 +1,11 @@
 package com.example.timedisplayapp
 
+import android.content.pm.ActivityInfo
+import androidx.activity.enableEdgeToEdge
 import android.os.Bundle
-import android.os.SystemClock
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -31,82 +32,45 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.timedisplayapp.ui.theme.TimeDisplayAppTheme
 import java.util.*
 
-fun randomColor(): Color {
-    val red = (0..255).random()
-    val green = (0..255).random()
-    val blue = (0..255).random()
-    return Color(red, green, blue)
-}
-
-data class Task(
-    var name: String,
-    var timeMsSpentBefore: Long = 0L,
-    var activateTimeMs: Long = 0L,
-    var isActive: Boolean = false,
-    var backGroundColor: Color = Color.Black,
-    var activeTick: Long = 0L,
-) {
-    constructor(name: String) : this(name = name, backGroundColor = randomColor())
-
-    fun formatTime(): String {
-        val timeMsSpent = if (isActive) {
-            timeMsSpentBefore + (SystemClock.elapsedRealtime() - activateTimeMs)
-        } else {
-            timeMsSpentBefore
-        }
-        val timeSSpent = timeMsSpent / 1000
-        val hours = timeSSpent / 3600
-        val minutes = (timeSSpent % 3600) / 60
-        val seconds = (timeSSpent % 60)
-        return String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds)
-    }
-
-    fun activate() {
-        Log.d("TaskManager", "$name Activate")
-        if (!isActive) {
-            activateTimeMs = SystemClock.elapsedRealtime()
-            isActive = true
-        }
-    }
-
-    fun deactivate() {
-        Log.d("TaskManager", "$name Deactivate")
-        if (isActive) {
-            timeMsSpentBefore += SystemClock.elapsedRealtime() - activateTimeMs
-            isActive = false
-        }
-    }
-}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+//        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+
+
         setContent {
             TimeDisplayAppTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     TaskManager(
-                        modifier = Modifier.padding(innerPadding)
+                        modifier = Modifier.padding(innerPadding),
                     )
                 }
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
     }
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun TaskManager(modifier: Modifier = Modifier) {
-    var id_cnt by remember { mutableIntStateOf(1) }
-    var tasks by remember { mutableStateOf(mapOf(id_cnt to Task("休息"))) }
+    // [state]
+    var id_cnt by rememberSaveable { mutableIntStateOf(1) }
+    var tasks by rememberSaveable { mutableStateOf(mapOf(1 to Task("Task 1"))) }
+    var activeTaskId by rememberSaveable { mutableStateOf<Int?>(1) }
+
+    // [other]
     var newTaskName by remember { mutableStateOf("") }
-    var activeTaskId by remember { mutableStateOf<Int?>(1) }
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     var showInputField by remember { mutableStateOf(false) }
@@ -219,13 +183,5 @@ fun TaskManager(modifier: Modifier = Modifier) {
                 keyboardController?.show()
             }
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun TaskManagerPreview() {
-    TimeDisplayAppTheme {
-        TaskManager()
     }
 }
