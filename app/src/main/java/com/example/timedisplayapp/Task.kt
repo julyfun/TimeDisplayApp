@@ -1,13 +1,11 @@
 package com.example.timedisplayapp
 
-import android.content.pm.ActivityInfo
 import android.os.SystemClock
-import androidx.activity.enableEdgeToEdge
 import java.util.Locale
 import java.io.Serializable
-import androidx.compose.runtime.*
 import android.util.Log
 import androidx.compose.ui.graphics.Color
+
 fun randomColor(): Color {
     val red = (0..255).random()
     val green = (0..255).random()
@@ -38,7 +36,7 @@ data class Task(
         return String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds)
     }
 
-    fun activate() {
+    fun try_activate() {
         Log.d("TaskManager", "$name Activate")
         if (!isActive) {
             activateTimeMs = SystemClock.elapsedRealtime()
@@ -46,11 +44,13 @@ data class Task(
         }
     }
 
-    fun deactivate() {
+    fun try_deactivate() {
         Log.d("TaskManager", "$name Deactivate")
         if (isActive) {
             timeMsSpentBefore += SystemClock.elapsedRealtime() - activateTimeMs
             isActive = false
         }
     }
+
 }
+

@@ -1,6 +1,5 @@
 package com.example.timedisplayapp
 
-import android.content.pm.ActivityInfo
 import androidx.activity.enableEdgeToEdge
 import android.os.Bundle
 import android.util.Log
@@ -34,52 +33,75 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModelProvider
 import com.example.timedisplayapp.ui.theme.TimeDisplayAppTheme
-import java.util.*
 
 
 class MainActivity : ComponentActivity() {
+    private lateinit var viewModel: TaskViewModel
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 //        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-
+        Log.d("MainActivity", "start viewModel")
+        viewModel = ViewModelProvider(
+            this,
+            ViewModelProvider.AndroidViewModelFactory.getInstance(application)
+        ).get(TaskViewModel::class.java)
+        Log.d("MainActivity", "start load disk")
+        Log.d("MainActivity", "end load disk")
 
         setContent {
             TimeDisplayAppTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     TaskManager(
                         modifier = Modifier.padding(innerPadding),
+                        viewModel = viewModel,
                     )
                 }
-            }
-        }
+            } }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        Log.d("MainActivity", "onStop")
+        viewModel.saveToDisk()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
+        Log.d("MainActivity", "onSaveInstanceState")
+        // save idCnt, tasks and activeTaskId
+    }
+
+    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        super.onRestoreInstanceState(savedInstanceState)
+        Log.d("MainActivity", "onRestoreInstanceState")
+        // load state
     }
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun TaskManager(modifier: Modifier = Modifier) {
+fun TaskManager(modifier: Modifier = Modifier, viewModel: TaskViewModel) {
     // [state]
-    var id_cnt by rememberSaveable { mutableIntStateOf(1) }
-    var tasks by rememberSaveable { mutableStateOf(mapOf(1 to Task("Task 1"))) }
-    var activeTaskId by rememberSaveable { mutableStateOf<Int?>(1) }
+    var idCnt by viewModel.idCntState
+    var tasks by viewModel.tasksState
+    var activeTaskId by viewModel.activeTaskIdState
 
     // [other]
-    var newTaskName by remember { mutableStateOf("") }
+    var newTaskName by rememberSaveable { mutableStateOf("") }
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     var showInputField by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        tasks[1]?.activate()
+        tasks[activeTaskId]?.try_activate()
         while (true) {
             kotlinx.coroutines.delay(50)
-            if (activeTaskId != null) {
+            Log.d("TaskManager", "Tick")
+            if (activeTaskId != 0) {
                 tasks = tasks.map { (id, task) ->
                     if (id == activeTaskId) {
                         // 自动更新的核心代码...
@@ -88,7 +110,7 @@ fun TaskManager(modifier: Modifier = Modifier) {
                         id to task
                     }
                 }.toMap()
-                Log.d("TaskManager", "activeTick: ${tasks[activeTaskId!!]?.activeTick}")
+                Log.d("TaskManager", "activeTick: ${tasks[activeTaskId]?.activeTick}")
             }
         }
     }
@@ -100,13 +122,13 @@ fun TaskManager(modifier: Modifier = Modifier) {
             Button(
                 onClick = {
                     if (id == activeTaskId) {
-                        task.deactivate()
-                        activeTaskId = null
+                        task.try_deactivate()
+                        activeTaskId = 0
                     } else {
-                        if (activeTaskId != null) {
-                            tasks[activeTaskId!!]?.deactivate()
+                        if (activeTaskId != 0) {
+                            tasks[activeTaskId]?.try_deactivate()
                         }
-                        task.activate()
+                        task.try_activate()
                         activeTaskId = id
                     }
                 },
@@ -124,7 +146,7 @@ fun TaskManager(modifier: Modifier = Modifier) {
                             if (offsetX < -100 && tasks.size > 1) { // Threshold for downward drag
                                 tasks = tasks.filterKeys { it != id }
                                 if (activeTaskId == id) {
-                                    activeTaskId = null
+                                    activeTaskId = 0
                                 }
                             }
                             offsetX = 0f
@@ -163,13 +185,13 @@ fun TaskManager(modifier: Modifier = Modifier) {
                     imeAction = ImeAction.Done,
                 ),
                 keyboardActions = KeyboardActions(onDone = {
-                    if (!newTaskName.isEmpty()) {
-                        id_cnt++
-                        tasks = tasks + (id_cnt to Task(newTaskName))
+                    if (newTaskName.isNotEmpty()) {
+                        idCnt++
+                        tasks = tasks + (idCnt to Task(newTaskName))
                     }
                     keyboardController?.hide()  // Hide the keyboard
                     newTaskName = ""
-                    Log.d("TaskManager", "Task added: $newTaskName $id_cnt")
+                    Log.d("TaskManager", "Task added: $newTaskName $idCnt")
                     focusManager.clearFocus()
                     showInputField = false
                 }),
