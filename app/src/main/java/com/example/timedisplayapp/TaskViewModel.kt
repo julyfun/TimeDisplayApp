@@ -36,7 +36,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         Log.d("TaskViewModel", "#1")
         val tasks: Map<Int, Task> =
             if (tasksJson.isEmpty()) {
-                mapOf(1 to Task("Task 1"))
+                mapOf(1 to Task("休息"))
             } else {
                 gson.fromJson(tasksJson, type)
             }

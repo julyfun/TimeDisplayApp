@@ -33,9 +33,13 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModelProvider
 import com.example.timedisplayapp.ui.theme.TimeDisplayAppTheme
 
+val ToRemoveColor = Color(0xffff544d)
+val ToCreateColor = Color(0xff23c138)
+const val DragPixLimit = 150
 
 class MainActivity : ComponentActivity() {
     private lateinit var viewModel: TaskViewModel
@@ -60,8 +64,10 @@ class MainActivity : ComponentActivity() {
                         viewModel = viewModel,
                     )
                 }
-            } }
+            }
+        }
     }
+
 
     override fun onStop() {
         super.onStop()
@@ -94,7 +100,7 @@ fun TaskManager(modifier: Modifier = Modifier, viewModel: TaskViewModel) {
     var newTaskName by rememberSaveable { mutableStateOf("") }
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
-    var showInputField by remember { mutableStateOf(false) }
+    var showInputField by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         tasks[activeTaskId]?.try_activate()
@@ -119,6 +125,8 @@ fun TaskManager(modifier: Modifier = Modifier, viewModel: TaskViewModel) {
         tasks.forEach { (id, task) ->
             var offsetX by remember { mutableStateOf(0f) }
             var offsetY by remember { mutableStateOf(0f) }
+            val toRemove by remember { derivedStateOf { offsetX < -DragPixLimit && tasks.size > 1 } }
+            val toCreate by remember { derivedStateOf { offsetY < -DragPixLimit } }
             Button(
                 onClick = {
                     if (id == activeTaskId) {
@@ -133,9 +141,9 @@ fun TaskManager(modifier: Modifier = Modifier, viewModel: TaskViewModel) {
                     }
                 },
                 modifier = Modifier
+                    .background(color = Color.Black)
                     .fillMaxWidth()
                     .weight(1f)
-                    .background(color = Color.Black)
                     .draggable(
                         state = rememberDraggableState { delta ->
                             offsetX += delta
@@ -143,7 +151,7 @@ fun TaskManager(modifier: Modifier = Modifier, viewModel: TaskViewModel) {
                         orientation = Orientation.Horizontal,
                         onDragStopped = {
                             Log.d("TaskManager", "offsetX: $offsetX")
-                            if (offsetX < -100 && tasks.size > 1) { // Threshold for downward drag
+                            if (toRemove) { // Threshold for downward drag
                                 tasks = tasks.filterKeys { it != id }
                                 if (activeTaskId == id) {
                                     activeTaskId = 0
@@ -159,19 +167,29 @@ fun TaskManager(modifier: Modifier = Modifier, viewModel: TaskViewModel) {
                         orientation = Orientation.Vertical,
                         onDragStopped = {
                             Log.d("TaskManager", "offsetY: $offsetY")
-                            if (offsetY < -100) { // Threshold for downward drag
+                            if (toCreate) { // Threshold for downward drag
                                 showInputField = true
                             }
                             offsetY = 0f
                         }
                     ),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = task.backGroundColor,
+                    // reverse the color if toRemove
+                    containerColor = Color(
+                        task.backGroundColor.red,
+                        task.backGroundColor.green,
+                        task.backGroundColor.blue,
+                        alpha =
+                        (1 + offsetX / DragPixLimit).coerceIn(0f, 1f)
+                    ),
+//                    containerColor =  task.backGroundColor,
                 ),
                 // 去除圆角
                 shape = RoundedCornerShape(0.dp),
             ) {
-                Text("${task.name}: ${task.formatTime()}", fontSize = 36.sp)
+                if (!toRemove) {
+                    Text("${task.name}: ${task.formatTime()}", fontSize = 36.sp)
+                }
             }
         }
 
@@ -180,7 +198,7 @@ fun TaskManager(modifier: Modifier = Modifier, viewModel: TaskViewModel) {
             TextField(
                 value = newTaskName,
                 onValueChange = { newTaskName = it },
-                placeholder = { Text("Enter new task") },
+                placeholder = { Text("输入新任务名称，若输入为空则取消") },
                 keyboardOptions = KeyboardOptions(
                     imeAction = ImeAction.Done,
                 ),
